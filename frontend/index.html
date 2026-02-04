@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Empathic AI Companion</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <!-- LEFT PANEL -->
+    <aside class="sidebar">
+        <div class="sidebar-top">
+            <div class="brand-row">
+                <div class="brand-dot"></div>
+                <span class="brand-text">Mike</span>
+            </div>
+            <button id="toggle-sidebar" class="icon-btn ghost" title="Collapse sidebar">‹</button>
+        </div>
+
+        <button id="new-chat" class="new-chat-btn">
+            <span class="btn-icon">+</span>
+            <span class="btn-text">New chat</span>
+        </button>
+
+        <div class="theme-toggle">
+            <span class="toggle-label">Theme</span>
+            <label class="switch">
+                <input id="theme-switch" type="checkbox" aria-label="Toggle dark mode">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="sidebar-section">Your chats</div>
+        <div id="chat-list" class="chat-list"></div>
+    </aside>
+
+    <!-- RIGHT CHAT PANEL -->
+    <main class="chat-area">
+
+        <header class="chat-header">
+            <div class="profile">
+                <img src="https://i.pinimg.com/564x/8d/ff/49/8dff49985d0d8afa53751d9ba8907aed.jpg" />
+                <div>
+                    <h3 id="chat-title">Mike</h3>
+                    <span class="status">Active now</span>
+                </div>
+            </div>
+        </header>
+
+        <section id="chat" class="messages"></section>
+
+        <footer class="input-box">
+            <input id="input"
+                   placeholder="Type a message..."
+                   onkeydown="if(event.key==='Enter') send()">
+            <button onclick="send()">➤</button>
+        </footer>
+
+    </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

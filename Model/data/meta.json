@@ -1,0 +1,8 @@
+{
+  "vocab_size": 8000,
+  "train_tokens": 27249426,
+  "val_tokens": 44482,
+  "test_tokens": 45030,
+  "dtype": "uint16",
+  "tokenizer": "C:\\Users\\MY ASUS\\Downloads\\Project1\\Model\\data\\tokenizer.json"
+}
