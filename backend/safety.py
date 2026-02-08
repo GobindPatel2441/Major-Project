@@ -1,14 +1,28 @@
-def safety_check(text):
-    keywords = [
-        "suicide", "kill myself", "self harm",
-        "die", "depressed", "worthless"
+def safety_level(text: str) -> str:
+    """
+    Classifies safety risk level based on explicit intent.
+    Returns: 'high' or 'low'
+    """
+    text = text.lower()
+
+    # Explicit self-harm / suicide intent (HIGH RISK)
+    high_risk_phrases = [
+        "kill myself",
+        "end my life",
+        "commit suicide",
+        "want to die",
+        "i want to die",
+        "i don't want to live",
+        "self harm",
+        "hurt myself",
+        "cut myself"
     ]
 
-    for word in keywords:
-        if word in text.lower():
-            return True
+    for phrase in high_risk_phrases:
+        if phrase in text:
+            return "high"
 
-    return False
+    return "low"
 
 
 def safety_response():

@@ -1,10 +1,18 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from .utils import wants_affirmation_only
 
-from emotion_detector import detect_emotion
-from safety import safety_check, safety_response
-from prompt import build_prompt
-from local_model import generate_clean_response
+
+from .emotion_detector import detect_emotion
+try:
+    from .prompt import build_prompt, wants_affirmation_only
+except ImportError:
+    from .prompt import build_prompt
+
+    def wants_affirmation_only(_text: str) -> bool:
+        return False
+from .safety import safety_level, safety_response
+from .local_model import generate_clean_response
 
 app = Flask(__name__)
 CORS(app)
@@ -14,20 +22,36 @@ def chat():
     user_text = request.json.get("message", "")
     history = request.json.get("history", [])
 
-    if safety_check(user_text):
+    #SAFETY CHECK (FIRST)
+    level = safety_level(user_text)
+
+    if level == "high":
         return jsonify({
             "emotion": "distress",
             "response": safety_response()
         })
 
-    emotion, score = detect_emotion(user_text)
-    prompt = build_prompt(user_text, emotion, history)
+    #EMOTION DETECTION
+    emotion_info = detect_emotion(user_text)
+
+    #PROMPT BUILDING
+    affirm_only = wants_affirmation_only(user_text, history)
+    prompt = build_prompt(
+        user_text,
+        emotion_info,
+        history,
+        affirm_only=affirm_only
+    )
 
     app.logger.info("Generating response...")
+
+    #OLLAMA RESPONSE
     return jsonify({
-        "emotion": emotion,
-        "response": generate_clean_response(prompt, user_text, emotion, history)
+        "emotion": emotion_info,
+        "response": generate_clean_response(prompt)
     })
+
+    
 
 if __name__ == "__main__":
     app.run(debug=True)
