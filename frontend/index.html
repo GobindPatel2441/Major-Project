@@ -14,7 +14,7 @@
         <div class="sidebar-top">
             <div class="brand-row">
                 <div class="brand-dot"></div>
-                <span class="brand-text">Mike</span>
+                <span class="brand-text">Chats</span>
             </div>
             <button id="toggle-sidebar" class="icon-btn ghost" title="Collapse sidebar">‹</button>
         </div>
@@ -40,22 +40,37 @@
     <main class="chat-area">
 
         <header class="chat-header">
-            <div class="profile">
-                <img src="https://i.pinimg.com/564x/8d/ff/49/8dff49985d0d8afa53751d9ba8907aed.jpg" />
-                <div>
-                    <h3 id="chat-title">Mike</h3>
-                    <span class="status">Active now</span>
+            <div class="chat-header-left">
+                <div class="profile">
+                    <img src="https://i.pinimg.com/564x/8d/ff/49/8dff49985d0d8afa53751d9ba8907aed.jpg" alt="Mika avatar" />
+                    <div>
+                        <h3 id="chat-title">Mike</h3>
+                        <span class="status">Active now</span>
+                    </div>
                 </div>
+            </div>
+            <div class="chat-header-actions">
+                <button class="icon-btn glass-icon" type="button" aria-label="Settings">
+                    ⚙
+                </button>
+                <button class="icon-btn glass-icon" type="button" aria-label="More options">
+                    ⋮
+                </button>
             </div>
         </header>
 
         <section id="chat" class="messages"></section>
 
         <footer class="input-box">
-            <input id="input"
-                   placeholder="Type a message..."
-                   onkeydown="if(event.key==='Enter') send()">
-            <button onclick="send()">➤</button>
+            <button class="input-icon-btn" type="button" aria-label="Add attachment">+</button>
+            <div class="input-wrapper">
+                <input id="input"
+                       placeholder="Type a message..."
+                       onkeydown="if(event.key==='Enter') send()">
+            </div>
+            <button id="send-btn" class="send-btn" type="button" onclick="send()" aria-label="Send message">
+                ➤
+            </button>
         </footer>
 
     </main>

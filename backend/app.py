@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from .utils import wants_affirmation_only
 
-
 from .emotion_detector import detect_emotion
 try:
     from .prompt import build_prompt, wants_affirmation_only
@@ -12,7 +11,8 @@ except ImportError:
     def wants_affirmation_only(_text: str) -> bool:
         return False
 from .safety import safety_level, safety_response
-from .local_model import generate_clean_response
+from .local_model import generate_clean_response, OLLAMA_URL
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -51,7 +51,23 @@ def chat():
         "response": generate_clean_response(prompt)
     })
 
-    
+
+@app.route("/status", methods=["GET"])
+def status():
+    """
+    Lightweight health check for the Ollama backend.
+    Tries to reach the Ollama HTTP API; if it responds at all,
+    we treat the AI server as online.
+    """
+    health_url = OLLAMA_URL.replace("/api/generate", "/api/tags")
+    try:
+        response = requests.get(health_url, timeout=3)
+        online = response.ok
+    except requests.exceptions.RequestException:
+        online = False
+
+    return jsonify({"status": "online" if online else "offline"})
+
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)

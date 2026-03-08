@@ -2,6 +2,14 @@ const STORAGE_KEY = "mika_chats_v1";
 const THEME_KEY = "mika_theme_v1";
 let chats = [];
 let activeChatId = null;
+let isSending = false;
+let typingNode = null;
+let apiBase = null;
+
+const API_BASE_CANDIDATES = [
+    "http://127.0.0.1:5000",
+    "http://localhost:5000"
+];
 
 window.onload = () => {
     wireUi();
@@ -12,6 +20,9 @@ window.onload = () => {
     } else {
         setActiveChat(activeChatId);
     }
+
+    checkServerStatus();
+    setInterval(checkServerStatus, 5000);
 };
 
 function wireUi() {
@@ -136,6 +147,54 @@ function updateHeader() {
     title.textContent = chat ? chat.title : "Mike";
 }
 
+async function checkServerStatus() {
+    const statusEl = document.querySelector(".status");
+    const sidebarDot = document.querySelector(".brand-dot");
+    if (!statusEl) return;
+
+    try {
+        const base = await resolveApiBase();
+        const res = await fetch(`${base}/status`);
+        const data = await res.json();
+        const isOnline = data && data.status === "online";
+
+        if (isOnline) {
+            statusEl.classList.remove("offline");
+            statusEl.textContent = "Active now";
+            if (sidebarDot) sidebarDot.style.background = "#22c55e";
+        } else {
+            statusEl.classList.add("offline");
+            statusEl.textContent = "Offline";
+            if (sidebarDot) sidebarDot.style.background = "#ef4444";
+        }
+    } catch (err) {
+        console.error("Failed to fetch server status", err);
+        statusEl.classList.add("offline");
+        statusEl.textContent = "Offline";
+        if (sidebarDot) sidebarDot.style.background = "#ef4444";
+    }
+}
+
+async function resolveApiBase() {
+    if (apiBase) return apiBase;
+
+    for (const candidate of API_BASE_CANDIDATES) {
+        const url = `${candidate}/status`;
+        try {
+            const res = await fetch(url);
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data && typeof data.status === "string") {
+                apiBase = candidate;
+                return apiBase;
+            }
+        } catch (_err) {
+            // Try next candidate.
+        }
+    }
+    throw new Error("No reachable backend API base URL.");
+}
+
 function renderChatList() {
     const list = document.getElementById("chat-list");
     list.innerHTML = "";
@@ -244,7 +303,37 @@ function renderMessages() {
         chat.appendChild(bubble);
     });
 
+    chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
+}
+
+function showTypingIndicator() {
+    const chat = document.getElementById("chat");
+    if (!chat) return;
+
+    // Remove any existing indicator before adding a new one
+    hideTypingIndicator();
+
+    typingNode = document.createElement("div");
+    typingNode.className = "typing-indicator";
+    typingNode.textContent = "Mika is typing...";
+    chat.appendChild(typingNode);
     chat.scrollTop = chat.scrollHeight;
+}
+
+function hideTypingIndicator() {
+    if (typingNode && typingNode.parentNode) {
+        typingNode.parentNode.removeChild(typingNode);
+    }
+    typingNode = null;
+}
+
+function setSendingState(sending) {
+    const sendBtn = document.getElementById("send-btn");
+    if (sendBtn) {
+        sendBtn.disabled = sending;
+        sendBtn.classList.toggle("is-loading", sending);
+    }
+    isSending = sending;
 }
 
 async function send() {
@@ -252,11 +341,13 @@ async function send() {
     const chat = document.getElementById("chat");
     const text = input.value.trim();
 
-    if (!text) return;
+    if (!text || isSending) return;
     if (!activeChatId) createNewChat();
 
     const active = chats.find((item) => item.id === activeChatId);
     if (!active) return;
+
+    setSendingState(true);
 
     active.messages.push({
         role: "user",
@@ -269,28 +360,49 @@ async function send() {
     renderChatList();
 
     input.value = "";
-    chat.scrollTop = chat.scrollHeight;
+    chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
+    showTypingIndicator();
 
-    // Backend call
-    const history = active.messages.slice(-8).map((msg) => ({
-        role: msg.role,
-        text: msg.text
-    }));
-    const res = await fetch("http://127.0.0.1:5000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history })
-    });
+    try {
+        // Backend call
+        const base = await resolveApiBase();
+        const history = active.messages.slice(-8).map((msg) => ({
+            role: msg.role,
+            text: msg.text
+        }));
+        const res = await fetch(`${base}/chat`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text, history })
+        });
 
-    const data = await res.json();
+        if (!res.ok) {
+            throw new Error(`Backend returned HTTP ${res.status}`);
+        }
+        const data = await res.json();
 
-    active.messages.push({
-        role: "bot",
-        text: data.response,
-        ts: Date.now()
-    });
-    active.updatedAt = Date.now();
-    saveChats();
-    renderMessages();
-    renderChatList();
+        active.messages.push({
+            role: "bot",
+            text: data.response,
+            ts: Date.now()
+        });
+        active.updatedAt = Date.now();
+        saveChats();
+        renderMessages();
+        renderChatList();
+    } catch (err) {
+        console.error("Failed to reach Mika backend", err);
+        active.messages.push({
+            role: "bot",
+            text: "Sorry, backend is unreachable. Run start_project.bat, wait 10 seconds, then refresh this page.",
+            ts: Date.now()
+        });
+        active.updatedAt = Date.now();
+        saveChats();
+        renderMessages();
+        renderChatList();
+    } finally {
+        hideTypingIndicator();
+        setSendingState(false);
+    }
 }

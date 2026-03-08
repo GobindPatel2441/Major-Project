@@ -26,7 +26,7 @@ def wants_affirmation_only(text: str, history=None) -> bool:
     for item in reversed(recent):
         if item.get("role") != "user":
             continue
-        content = item.get("content", "").lower()
+        content = (item.get("content") or item.get("text", "")).lower()
         if any(t in content for t in triggers):
             return True
     return False
@@ -47,7 +47,7 @@ def build_prompt(user_text, emotion_info, history=None, affirm_only=False):
         lines = []
         for item in history:
             role = item.get("role", "user")
-            content = item.get("content", "")
+            content = item.get("content") or item.get("text", "")
             lines.append(f"{role}: {content}")
         history_block = "\n".join(lines)
 
