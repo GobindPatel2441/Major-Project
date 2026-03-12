@@ -1,77 +1,165 @@
-def wants_affirmation_only(text: str, history=None) -> bool:
-    text = text.lower()
-    triggers = [
-        "stop asking",
-        "stop asking questions",
-        "no questions",
-        "no question",
-        "just tell me",
-        "just reassure me",
-        "just need affirmation",
-        "i just want affirmation",
-        "just say something",
-        "don't ask",
-        "dont ask",
-        "don't ask questions",
-        "dont ask questions",
-        "wish me luck",
-        "just support me"
+import re
+
+# -----------------------------
+# Affirmation Detection
+# -----------------------------
+
+AFFIRM_PATTERNS = [
+    re.compile(p, re.IGNORECASE)
+    for p in [
+        r"stop asking",
+        r"stop asking questions",
+        r"no questions?",
+        r"dont ask",
+        r"don't ask",
+        r"dont ask questions",
+        r"don't ask questions",
+        r"just reassure",
+        r"just support",
+        r"just tell me",
+        r"only support",
+        r"wish me luck",
+        r"no advice",
+        r"i just need (support|reassurance|encouragement)",
+        r"just need affirmation",
+        r"i just want affirmation",
     ]
-    if any(t in text for t in triggers):
+]
+
+
+def wants_affirmation_only(text: str, history=None) -> bool:
+    text = text.lower().strip()
+
+    # Check current message
+    if any(pattern.search(text) for pattern in AFFIRM_PATTERNS):
         return True
 
     history = history or []
-    # If the user recently asked for no questions, keep affirm-only for a bit.
-    recent = history[-6:]
-    for item in reversed(recent):
+
+    # Check recent user messages
+    for item in reversed(history[-6:]):
         if item.get("role") != "user":
             continue
-        content = (item.get("content") or item.get("text", "")).lower()
-        if any(t in content for t in triggers):
+
+        content = (item.get("content") or item.get("text", "")).lower().strip()
+
+        if any(pattern.search(content) for pattern in AFFIRM_PATTERNS):
             return True
+
     return False
 
 
-def build_prompt(user_text, emotion_info, history=None, affirm_only=False):
-    primary = emotion_info.get("primary", "neutral")
-    severity = emotion_info.get("severity", "low")
+# -----------------------------
+# Prompt Builder
+# -----------------------------
 
+def build_prompt(user_text, emotion_info, history=None, affirm_only=False):
+
+    user_text = user_text.strip()
+    emotion_info = emotion_info or {}
+
+    primary = (emotion_info.get("primary") or "neutral")
+    severity = (emotion_info.get("severity") or "low")
+
+    # Tone selection
     tone = "Be calm, validating, and kind."
     if severity in {"medium", "high"}:
         tone = "Be extra gentle, grounding, and validating."
 
+    # Emotion-specific guidance
+    emotion_guidance = ""
+
+    if primary == "anxiety":
+        emotion_guidance = """
+If the user feels anxious:
+- Offer reassurance
+- Normalize uncertainty
+- Encourage calm perspective
+"""
+
+    elif primary == "sadness":
+        emotion_guidance = """
+If the user feels sad:
+- Validate their feelings
+- Avoid jumping straight to solutions
+- Show empathy
+"""
+
+    elif primary == "frustration":
+        emotion_guidance = """
+If the user feels frustrated:
+- Acknowledge the difficulty
+- Validate their effort
+- Respond calmly
+"""
+
+    elif primary == "anger":
+        emotion_guidance = """
+If the user feels angry:
+- Stay calm and non-judgmental
+- Acknowledge the emotion
+- Avoid escalating
+"""
+
     history = history or []
-    history_block = ""
-    if history:
-        # Expecting list of {"role": "...", "content": "..."} objects
-        lines = []
-        for item in history:
-            role = item.get("role", "user")
-            content = item.get("content") or item.get("text", "")
-            lines.append(f"{role}: {content}")
-        history_block = "\n".join(lines)
 
+    # Limit history for token efficiency
+    recent_history = history[-4:]
+
+    history_lines = []
+    for item in recent_history:
+        role = item.get("role", "user")
+        content = item.get("content") or item.get("text", "")
+        history_lines.append(f"{role.upper()}: {content}")
+
+    history_block = "\n".join(history_lines) or "None"
+
+    # Question behavior
     if affirm_only:
-        question_rule = "Do NOT ask any questions. End with a firm, supportive statement."
+        question_rule = """
+Conversation mode: affirmation_only = True
+
+Rules:
+- NEVER ask questions
+- NEVER request clarification
+- Provide reassurance and encouragement
+- End with a supportive statement
+"""
     else:
-        question_rule = "React first, then ask ONE gentle follow-up question."
+        question_rule = """
+Conversation mode: affirmation_only = False
 
-    return f"""
-You are an emotionally intelligent AI companion.
+Rules:
+- You may ask ONE gentle follow-up question
+- Only if it helps the user continue talking
+- Do NOT ask multiple questions
+- Do NOT interrogate the user
+"""
 
-Detected user emotion:
-- Emotion: {primary}
-- Severity: {severity}
+    prompt = f"""
+You are a calm, emotionally intelligent AI companion.
 
-Response guidelines:
-- {tone}
-- Keep replies SHORT (2-4 sentences)
+User emotional state:
+Emotion: {primary}
+Severity: {severity}
+
+Tone:
+{tone}
+
+Emotion guidance:
+{emotion_guidance}
+
+Response rules:
+- Keep replies SHORT (2–4 sentences)
 - Sound natural and human
-- {question_rule}
-- NEVER argue with the user
-- NEVER over-explain
+- Be supportive and empathetic
+- Never argue with the user
+- Never lecture
+- Never over-explain
 
-Conversation so far:
+{question_rule}
+
+Conversation history:
 {history_block}
 
 User message:
@@ -79,3 +167,5 @@ User message:
 
 Respond like a caring friend.
 """
+
+    return prompt
