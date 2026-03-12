@@ -11,29 +11,32 @@
 
     <!-- LEFT PANEL -->
     <aside class="sidebar">
-        <div class="sidebar-top">
-            <div class="brand-row">
-                <div class="brand-dot"></div>
-                <span class="brand-text">Chats</span>
+        <button id="toggle-sidebar" class="icon-btn sidebar-toggle-btn ghost" type="button" aria-label="Toggle sidebar">&lt;</button>
+
+        <div class="sidebar-inner">
+            <div class="sidebar-top">
+                <div class="brand-row">
+                    <div class="brand-dot"></div>
+                    <span class="brand-text">Chats</span>
+                </div>
             </div>
-            <button id="toggle-sidebar" class="icon-btn ghost" title="Collapse sidebar">‹</button>
+
+            <button id="new-chat" class="new-chat-btn">
+                <span class="btn-icon">+</span>
+                <span class="btn-text">New chat</span>
+            </button>
+
+            <div class="theme-toggle">
+                <span class="toggle-label">Theme</span>
+                <label class="switch">
+                    <input id="theme-switch" type="checkbox" aria-label="Toggle dark mode">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="sidebar-section">Your chats</div>
+            <div id="chat-list" class="chat-list"></div>
         </div>
-
-        <button id="new-chat" class="new-chat-btn">
-            <span class="btn-icon">+</span>
-            <span class="btn-text">New chat</span>
-        </button>
-
-        <div class="theme-toggle">
-            <span class="toggle-label">Theme</span>
-            <label class="switch">
-                <input id="theme-switch" type="checkbox" aria-label="Toggle dark mode">
-                <span class="slider"></span>
-            </label>
-        </div>
-
-        <div class="sidebar-section">Your chats</div>
-        <div id="chat-list" class="chat-list"></div>
     </aside>
 
     <!-- RIGHT CHAT PANEL -->
@@ -49,10 +52,20 @@
                     </div>
                 </div>
             </div>
-            <div class="chat-header-actions">
-                <button class="icon-btn glass-icon" type="button" aria-label="Settings">
+            <div class="chat-header-actions" style="position: relative;">
+                <button id="settings-btn" class="icon-btn glass-icon" type="button" aria-label="Settings">
                     ⚙
                 </button>
+                <div id="settings-menu" class="settings-menu hidden">
+                    <div class="settings-item">
+                        <span>UI Scale</span>
+                        <div class="zoom-controls">
+                            <button id="zoom-out-btn" class="zoom-btn" type="button" title="Decrease size">−</button>
+                            <span id="zoom-level-text">100%</span>
+                            <button id="zoom-in-btn" class="zoom-btn" type="button" title="Increase size">+</button>
+                        </div>
+                    </div>
+                </div>
                 <button class="icon-btn glass-icon" type="button" aria-label="More options">
                     ⋮
                 </button>
@@ -68,6 +81,7 @@
                        placeholder="Type a message..."
                        onkeydown="if(event.key==='Enter') send()">
             </div>
+            <button id="mic-btn" class="input-icon-btn" type="button" aria-label="Voice Input">🎤</button>
             <button id="send-btn" class="send-btn" type="button" onclick="send()" aria-label="Send message">
                 ➤
             </button>

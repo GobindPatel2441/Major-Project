@@ -127,18 +127,68 @@ body.theme-light .container {
 /* SIDEBAR */
 .sidebar {
     width: 280px;
-    min-width: 260px;
-    max-width: 320px;
+    min-width: 280px;
+    flex-shrink: 0;
+    position: relative;
     background: var(--sidebar-bg);
     color: var(--sidebar-text);
     border-right: 1px solid var(--sidebar-border);
-    padding: 18px 14px;
+    padding: 16px;
+    overflow: hidden;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    /* Expand: width grows immediately */
+    transition: width 0.2s ease, min-width 0.2s ease, background 0.25s ease, border-color 0.25s ease;
+}
+
+body.sidebar-collapsed .sidebar {
+    width: 52px;
+    min-width: 52px;
+    /* Collapse: wait for content to fully vanish (0.14s) THEN shrink */
+    transition: width 0.2s ease 0.14s, min-width 0.2s ease 0.14s, background 0.25s ease, border-color 0.25s ease;
+}
+
+/* Inner content fades when collapsed */
+.sidebar-inner {
+    padding-top: 52px;
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+    pointer-events: auto;
+    transform-origin: left center;
+    /* Expand: visibility flips to visible instantly at delay start, then content fades in */
+    transition: opacity 0.15s ease 0.18s, transform 0.15s ease 0.18s, visibility 0s linear 0.18s;
     display: flex;
     flex-direction: column;
     gap: 14px;
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    transition: width 0.25s ease, padding 0.25s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+body.sidebar-collapsed .sidebar-inner {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-6px);
+    pointer-events: none;
+    /* Collapse: fade 0.12s, then visibility snaps to hidden at 0.12s — fully gone before width shrinks */
+    transition: opacity 0.12s ease, transform 0.12s ease, visibility 0s linear 0.12s;
+}
+
+/* Absolutely-positioned toggle button — always visible */
+.sidebar-toggle-btn {
+    position: absolute !important;
+    top: 16px;
+    right: 12px;
+    z-index: 10;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    opacity: 0.85;
+    transition: opacity 0.2s ease, background 0.18s ease !important;
 }
 
 .sidebar-top {
@@ -430,6 +480,8 @@ body.theme-light .chat-area {
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     transition: background 0.25s ease, border-color 0.25s ease;
+    position: relative;
+    z-index: 50;
 }
 
 body.theme-light .chat-header {
@@ -811,7 +863,6 @@ body.sidebar-collapsed .theme-toggle {
     }
 }
 
-
 .brand-dot {
     width: 10px;
     height: 10px;
@@ -820,3 +871,75 @@ body.sidebar-collapsed .theme-toggle {
     box-shadow: 0 0 0 4px rgba(16,185,129,0.15);
 }
 
+/* SETTINGS MENU */
+.settings-menu {
+    position: absolute;
+    top: 48px;
+    right: 0px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: var(--glass-shadow);
+    z-index: 100;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    min-width: 180px;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+}
+
+.settings-menu.hidden {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    pointer-events: none;
+}
+
+.settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    color: var(--text-main);
+}
+
+.zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.5);
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--sidebar-btn-border);
+}
+
+body.theme-light .zoom-controls {
+    background: #f6ede7;
+}
+
+.zoom-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    cursor: pointer;
+    font-size: 16px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.zoom-btn:hover {
+    background: rgba(148, 163, 184, 0.2);
+}
+
+#zoom-level-text {
+    font-size: 12px;
+    min-width: 40px;
+    text-align: center;
+}

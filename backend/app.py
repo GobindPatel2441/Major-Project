@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
+import json
 from flask_cors import CORS
 from .utils import wants_affirmation_only
 
@@ -11,7 +12,7 @@ except ImportError:
     def wants_affirmation_only(_text: str) -> bool:
         return False
 from .safety import safety_level, safety_response
-from .local_model import generate_clean_response, OLLAMA_URL
+from .local_model import generate_clean_response, generate_clean_response_stream, OLLAMA_URL
 import requests
 
 app = Flask(__name__)
@@ -45,11 +46,13 @@ def chat():
 
     app.logger.info("Generating response...")
 
-    #OLLAMA RESPONSE
-    return jsonify({
-        "emotion": emotion_info,
-        "response": generate_clean_response(prompt)
-    })
+    #OLLAMA RESPONSE STREAM
+    def generate():
+        yield json.dumps({"type": "emotion", "data": emotion_info}) + "\n"
+        for chunk in generate_clean_response_stream(prompt):
+            yield json.dumps({"type": "chunk", "data": chunk}) + "\n"
+            
+    return Response(generate(), mimetype='application/x-ndjson')
 
 
 @app.route("/status", methods=["GET"])

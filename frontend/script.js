@@ -1,10 +1,12 @@
 const STORAGE_KEY = "mika_chats_v1";
 const THEME_KEY = "mika_theme_v1";
+const ZOOM_KEY = "mika_zoom_v1";
 let chats = [];
 let activeChatId = null;
 let isSending = false;
 let typingNode = null;
 let apiBase = null;
+let currentZoom = 1;
 
 const API_BASE_CANDIDATES = [
     "http://127.0.0.1:5000",
@@ -32,8 +34,49 @@ function wireUi() {
 
     newChatBtn.addEventListener("click", createNewChat);
     toggleBtn.addEventListener("click", () => {
-        document.body.classList.toggle("sidebar-collapsed");
+        const isCollapsed = document.body.classList.toggle("sidebar-collapsed");
+        toggleBtn.textContent = isCollapsed ? ">" : "<";
     });
+    
+    // Settings and Zoom UI
+    const settingsBtn = document.getElementById("settings-btn");
+    const settingsMenu = document.getElementById("settings-menu");
+    const zoomInBtn = document.getElementById("zoom-in-btn");
+    const zoomOutBtn = document.getElementById("zoom-out-btn");
+
+    if (settingsBtn && settingsMenu) {
+        settingsBtn.addEventListener("click", () => {
+            settingsMenu.classList.toggle("hidden");
+        });
+        
+        document.addEventListener("click", (e) => {
+            if (!settingsBtn.contains(e.target) && !settingsMenu.contains(e.target)) {
+                settingsMenu.classList.add("hidden");
+            }
+        });
+    }
+
+    const savedZoom = localStorage.getItem(ZOOM_KEY);
+    if (savedZoom) {
+        currentZoom = parseFloat(savedZoom);
+        applyZoom();
+    }
+
+    if (zoomInBtn && zoomOutBtn) {
+        zoomInBtn.addEventListener("click", () => {
+            if (currentZoom < 1.5) {
+                currentZoom = Math.min(1.5, currentZoom + 0.1);
+                applyZoom();
+            }
+        });
+
+        zoomOutBtn.addEventListener("click", () => {
+            if (currentZoom > 0.5) {
+                currentZoom = Math.max(0.5, currentZoom - 0.1);
+                applyZoom();
+            }
+        });
+    }
 
     const savedTheme = localStorage.getItem(THEME_KEY) || "dark";
     applyTheme(savedTheme, themeSwitch);
@@ -53,6 +96,15 @@ function applyTheme(theme, themeSwitch) {
     }
 }
 
+function applyZoom() {
+    document.body.style.zoom = currentZoom;
+    const zoomLevelText = document.getElementById("zoom-level-text");
+    if (zoomLevelText) {
+        zoomLevelText.textContent = `${Math.round(currentZoom * 100)}%`;
+    }
+    localStorage.setItem(ZOOM_KEY, currentZoom);
+}
+
 function defaultChat() {
     const id = `chat_${Date.now()}`;
     return {
@@ -63,7 +115,7 @@ function defaultChat() {
         messages: [
             {
                 role: "bot",
-                text: "Hi! I'm Mika. How are you feeling today?",
+                text: "Hi! I'm Mike. How are you feeling today?",
                 ts: Date.now()
             }
         ]
@@ -379,16 +431,42 @@ async function send() {
         if (!res.ok) {
             throw new Error(`Backend returned HTTP ${res.status}`);
         }
-        const data = await res.json();
 
-        active.messages.push({
-            role: "bot",
-            text: data.response,
-            ts: Date.now()
-        });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        
+        let botMessage = { role: "bot", text: "", ts: Date.now() };
+        active.messages.push(botMessage);
+        
+        hideTypingIndicator();
+
+        let buffer = "";
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            let newlineIdx;
+            while ((newlineIdx = buffer.indexOf('\n')) >= 0) {
+                const line = buffer.slice(0, newlineIdx);
+                buffer = buffer.slice(newlineIdx + 1);
+                
+                if (line.trim()) {
+                    try {
+                        const parsed = JSON.parse(line);
+                        if (parsed.type === "chunk") {
+                            botMessage.text += parsed.data;
+                            renderMessages();
+                        }
+                    } catch (e) {
+                        console.error("Stream parse error", e, line);
+                    }
+                }
+            }
+        }
+        
         active.updatedAt = Date.now();
         saveChats();
-        renderMessages();
         renderChatList();
     } catch (err) {
         console.error("Failed to reach Mika backend", err);
