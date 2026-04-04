@@ -86,6 +86,76 @@ function wireUi() {
         applyTheme(nextTheme, themeSwitch);
         localStorage.setItem(THEME_KEY, nextTheme);
     });
+
+    // ── Voice-to-text ──────────────────────────────────────────────
+    const micBtn = document.getElementById("mic-btn");
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        if (micBtn) {
+            micBtn.title = "Voice input not supported in this browser";
+            micBtn.style.opacity = "0.4";
+            micBtn.style.cursor = "not-allowed";
+        }
+    } else {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
+
+        let isListening = false;
+        let baseText = "";   // text already in the input before mic was pressed
+
+        micBtn.addEventListener("click", () => {
+            if (isListening) {
+                isListening = false;
+                recognition.stop();
+            } else {
+                baseText = document.getElementById("input").value;
+                isListening = true;
+                recognition.start();
+            }
+        });
+
+        recognition.onstart = () => {
+            micBtn.classList.add("mic-active");
+            micBtn.title = "Click to stop";
+        };
+
+        recognition.onresult = (e) => {
+            let interim = "";
+            let final = "";
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                const t = e.results[i][0].transcript;
+                if (e.results[i].isFinal) {
+                    final += t;
+                } else {
+                    interim += t;
+                }
+            }
+            document.getElementById("input").value = baseText + final + interim;
+            if (final) baseText += final;
+        };
+
+        recognition.onend = () => {
+            // Auto-restart if the user hasn't manually stopped
+            if (isListening) {
+                recognition.start();
+            } else {
+                micBtn.classList.remove("mic-active");
+                micBtn.title = "Voice Input";
+            }
+        };
+
+        recognition.onerror = (e) => {
+            // "no-speech" / "audio-capture" etc. — keep going if still active
+            if (e.error === "no-speech" || e.error === "audio-capture") return;
+            console.error("Speech recognition error:", e.error);
+            isListening = false;
+            micBtn.classList.remove("mic-active");
+            micBtn.title = "Voice Input";
+        };
+    }
 }
 
 function applyTheme(theme, themeSwitch) {
@@ -437,8 +507,10 @@ async function send() {
         
         let botMessage = { role: "bot", text: "", ts: Date.now() };
         active.messages.push(botMessage);
-        
-        hideTypingIndicator();
+
+        // Bot bubble is created lazily on first chunk; typing indicator stays until then
+        const chatEl = document.getElementById("chat");
+        let botBubble = null;
 
         let buffer = "";
         while (true) {
@@ -455,8 +527,16 @@ async function send() {
                     try {
                         const parsed = JSON.parse(line);
                         if (parsed.type === "chunk") {
+                            // On first chunk: hide typing indicator & create bot bubble
+                            if (!botBubble) {
+                                hideTypingIndicator();
+                                botBubble = document.createElement("div");
+                                botBubble.className = "message bot";
+                                chatEl.appendChild(botBubble);
+                            }
                             botMessage.text += parsed.data;
-                            renderMessages();
+                            botBubble.textContent = botMessage.text;
+                            chatEl.scrollTop = chatEl.scrollHeight;
                         }
                     } catch (e) {
                         console.error("Stream parse error", e, line);

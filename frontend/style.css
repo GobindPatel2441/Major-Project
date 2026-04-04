@@ -943,3 +943,18 @@ body.theme-light .zoom-controls {
     min-width: 40px;
     text-align: center;
 }
+
+/* MIC ACTIVE STATE */
+#mic-btn.mic-active {
+    background: radial-gradient(circle at 0% 0%, rgba(239, 68, 68, 0.85), rgba(185, 28, 28, 0.7));
+    border-color: rgba(239, 68, 68, 0.8);
+    color: #ffffff;
+    animation: mic-pulse 1.2s ease-in-out infinite;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+}
+
+@keyframes mic-pulse {
+    0%   { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0.55); }
+    60%  { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);   }
+    100% { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0);    }
+}
