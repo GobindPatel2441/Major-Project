@@ -1,6 +1,7 @@
 const STORAGE_KEY = "mika_chats_v1";
 const THEME_KEY = "mika_theme_v1";
 const ZOOM_KEY = "mika_zoom_v1";
+const LANG_KEY = "mika_lang_v1";
 let chats = [];
 let activeChatId = null;
 let isSending = false;
@@ -12,6 +13,22 @@ const API_BASE_CANDIDATES = [
     "http://127.0.0.1:5000",
     "http://localhost:5000"
 ];
+
+// BCP-47 speech codes mapped to each supported language
+const SPEECH_LANG_MAP = {
+    "English":    "en-US",
+    "Hindi":      "hi-IN",
+    "Bengali":    "bn-IN",
+    "Tamil":      "ta-IN",
+    "Telugu":     "te-IN",
+    "Marathi":    "mr-IN",
+    "Gujarati":   "gu-IN",
+    "Kannada":    "kn-IN",
+    "Malayalam":  "ml-IN",
+    "Punjabi":    "pa-IN",
+    "Odia":       "or-IN",
+    "Assamese":   "as-IN",
+};
 
 window.onload = () => {
     wireUi();
@@ -26,6 +43,27 @@ window.onload = () => {
     checkServerStatus();
     setInterval(checkServerStatus, 5000);
 };
+
+function getSelectedLanguage() {
+    const sel = document.getElementById("language-select");
+    return sel ? sel.value : "English";
+}
+
+// [UPGRADE 6] Speech error toast notification
+function showSpeechError(msg) {
+    const existing = document.querySelector('.speech-error-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'speech-error-toast';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
 
 function wireUi() {
     const newChatBtn = document.getElementById("new-chat");
@@ -87,6 +125,22 @@ function wireUi() {
         localStorage.setItem(THEME_KEY, nextTheme);
     });
 
+    // ── Language selector persistence ────────────────────────────
+    const langSelect = document.getElementById("language-select");
+    if (langSelect) {
+        const savedLang = localStorage.getItem(LANG_KEY);
+        if (savedLang) {
+            langSelect.value = savedLang;
+        }
+        langSelect.addEventListener("change", () => {
+            localStorage.setItem(LANG_KEY, langSelect.value);
+            // Update speech recognition language when dropdown changes
+            if (typeof updateRecognitionLang === "function") {
+                updateRecognitionLang(langSelect.value);
+            }
+        });
+    }
+
     // ── Voice-to-text ──────────────────────────────────────────────
     const micBtn = document.getElementById("mic-btn");
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -101,19 +155,46 @@ function wireUi() {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = "en-US";
+
+        // Set initial language from dropdown
+        const initLang = getSelectedLanguage();
+        recognition.lang = SPEECH_LANG_MAP[initLang] || "en-US";
 
         let isListening = false;
         let baseText = "";   // text already in the input before mic was pressed
+        let speechTimeout = null;  // [UPGRADE 6] safety timeout
+
+        // Expose a function so the language dropdown can update recognition.lang
+        window.updateRecognitionLang = (langName) => {
+            recognition.lang = SPEECH_LANG_MAP[langName] || "en-US";
+        };
 
         micBtn.addEventListener("click", () => {
             if (isListening) {
                 isListening = false;
                 recognition.stop();
+                if (speechTimeout) { clearTimeout(speechTimeout); speechTimeout = null; }
             } else {
+                const currentLang = getSelectedLanguage();
+                recognition.lang = SPEECH_LANG_MAP[currentLang] || "en-US";
                 baseText = document.getElementById("input").value;
                 isListening = true;
-                recognition.start();
+                try {
+                    recognition.start();
+                } catch (err) {
+                    console.error("Failed to start speech recognition:", err);
+                    isListening = false;
+                    showSpeechError("Could not start voice input. Please type instead.");
+                    return;
+                }
+                // [UPGRADE 6] Auto-stop after 60 seconds
+                speechTimeout = setTimeout(() => {
+                    if (isListening) {
+                        isListening = false;
+                        recognition.stop();
+                        showSpeechError("Voice input timed out. Click mic to try again.");
+                    }
+                }, 60000);
             }
         });
 
@@ -138,22 +219,33 @@ function wireUi() {
         };
 
         recognition.onend = () => {
-            // Auto-restart if the user hasn't manually stopped
             if (isListening) {
-                recognition.start();
+                try { recognition.start(); } catch (_) { /* browser may block rapid restarts */ }
             } else {
                 micBtn.classList.remove("mic-active");
                 micBtn.title = "Voice Input";
+                if (speechTimeout) { clearTimeout(speechTimeout); speechTimeout = null; }
             }
         };
 
+        // [UPGRADE 6] Robust speech error handling with user feedback
         recognition.onerror = (e) => {
-            // "no-speech" / "audio-capture" etc. — keep going if still active
             if (e.error === "no-speech" || e.error === "audio-capture") return;
             console.error("Speech recognition error:", e.error);
             isListening = false;
             micBtn.classList.remove("mic-active");
             micBtn.title = "Voice Input";
+            if (speechTimeout) { clearTimeout(speechTimeout); speechTimeout = null; }
+
+            let errorMsg = "Voice input failed. Please type your message.";
+            if (e.error === "not-allowed") {
+                errorMsg = "Microphone access denied. Please allow mic in browser settings.";
+            } else if (e.error === "network") {
+                errorMsg = "Network error during voice input. Check your connection.";
+            } else if (e.error === "language-not-supported") {
+                errorMsg = `Voice not available for ${getSelectedLanguage()}. Please type instead.`;
+            }
+            showSpeechError(errorMsg);
         };
     }
 }
@@ -437,7 +529,14 @@ function showTypingIndicator() {
 
     typingNode = document.createElement("div");
     typingNode.className = "typing-indicator";
-    typingNode.textContent = "Mika is typing...";
+
+    const lang = getSelectedLanguage();
+    if (lang !== "English") {
+        typingNode.textContent = "Translating & thinking...";
+    } else {
+        typingNode.textContent = "Mike is typing...";
+    }
+
     chat.appendChild(typingNode);
     chat.scrollTop = chat.scrollHeight;
 }
@@ -469,6 +568,8 @@ async function send() {
     const active = chats.find((item) => item.id === activeChatId);
     if (!active) return;
 
+    const language = getSelectedLanguage();
+
     setSendingState(true);
 
     active.messages.push({
@@ -486,7 +587,7 @@ async function send() {
     showTypingIndicator();
 
     try {
-        // Backend call
+        // Backend call — now includes language
         const base = await resolveApiBase();
         const history = active.messages.slice(-8).map((msg) => ({
             role: msg.role,
@@ -495,7 +596,7 @@ async function send() {
         const res = await fetch(`${base}/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text, history })
+            body: JSON.stringify({ message: text, history, language })
         });
 
         if (!res.ok) {
@@ -526,8 +627,10 @@ async function send() {
                 if (line.trim()) {
                     try {
                         const parsed = JSON.parse(line);
-                        if (parsed.type === "chunk") {
-                            // On first chunk: hide typing indicator & create bot bubble
+
+                        if (parsed.type === "chunk" || parsed.type === "full_response") {
+                            // Unified handler: works for English word-by-word
+                            // AND non-English sentence-level streaming
                             if (!botBubble) {
                                 hideTypingIndicator();
                                 botBubble = document.createElement("div");

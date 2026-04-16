@@ -15,6 +15,9 @@ def intensity_to_severity(x):
     if x < 0.8: return 3
     return 4
 
+def clip_intensity(x):
+    return max(0.0, min(1.0, float(x)))
+
 def suppress_secondary_emotions(scores, threshold=0.6):
     """
     scores = {'anger': x, 'fear': y, ...}
