@@ -2,7 +2,14 @@ from flask import Flask, request, jsonify, Response
 import json
 import re
 import time
+import base64
+import numpy as np
+import cv2
+import os
+from deepface import DeepFace
 from flask_cors import CORS
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from .utils import wants_affirmation_only
 
 from .emotion_detector import detect_emotion
@@ -68,6 +75,24 @@ def chat():
     user_text = request.json.get("message", "")
     history = request.json.get("history", [])
     language = request.json.get("language", "English")
+    image_b64 = request.json.get("image", None)
+
+    # ── Facial Emotion Detection ────────────────────────────────────
+    facial_emotion = None
+    if image_b64:
+        try:
+            encoded_data = image_b64.split(",")[1]
+            nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            results = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
+            if isinstance(results, list) and len(results) > 0:
+                facial_emotion = results[0]['dominant_emotion']
+            elif isinstance(results, dict):
+                facial_emotion = results.get('dominant_emotion')
+            logger.info("[Debug] Facial emotion detected: %s", facial_emotion)
+        except Exception as e:
+            logger.error(f"Facial emotion detection failed: {e}")
 
     # ── Validate language ──────────────────────────────────────────
     if language not in SUPPORTED_LANGUAGES:
@@ -146,6 +171,7 @@ def chat():
         history,
         affirm_only=affirm_only,
         original_text=original_text if needs_output_translation else None,
+        facial_emotion=facial_emotion,
     )
 
     app.logger.info("Generating response...")

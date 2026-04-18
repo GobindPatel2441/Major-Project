@@ -65,6 +65,15 @@
                             <button id="zoom-in-btn" class="zoom-btn" type="button" title="Increase size">+</button>
                         </div>
                     </div>
+                    <div class="settings-item" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 13px; color: var(--text-main);">Emotion Tracker</span>
+                        <label class="switch">
+                            <input id="webcam-switch" type="checkbox" aria-label="Toggle webcam emotion tracking">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <video id="webcam-feed" autoplay playsinline muted style="display: none;"></video>
+                    <canvas id="webcam-canvas" style="display: none;"></canvas>
                 </div>
                 <button class="icon-btn glass-icon" type="button" aria-label="More options">
                     ⋮

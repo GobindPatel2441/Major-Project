@@ -9,6 +9,9 @@ let typingNode = null;
 let apiBase = null;
 let currentZoom = 1;
 
+let webcamStream = null;
+const WEBCAM_KEY = "mika_webcam_v1";
+
 const API_BASE_CANDIDATES = [
     "http://127.0.0.1:5000",
     "http://localhost:5000"
@@ -32,6 +35,7 @@ const SPEECH_LANG_MAP = {
 
 window.onload = () => {
     wireUi();
+    wireWebcam();
     loadChats();
     renderChatList();
     if (!activeChatId) {
@@ -63,6 +67,81 @@ function showSpeechError(msg) {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 300);
     }, 4000);
+}
+
+function wireWebcam() {
+    const webcamSwitch = document.getElementById("webcam-switch");
+    if (!webcamSwitch) return;
+
+    const savedWebcam = localStorage.getItem(WEBCAM_KEY) === "true";
+    webcamSwitch.checked = savedWebcam;
+    if (savedWebcam) {
+        startWebcam();
+    }
+
+    webcamSwitch.addEventListener("change", () => {
+        const isEnabled = webcamSwitch.checked;
+        localStorage.setItem(WEBCAM_KEY, isEnabled.toString());
+        if (isEnabled) {
+            startWebcam();
+        } else {
+            stopWebcam();
+        }
+    });
+
+    // Ensure video elements exist
+    let video = document.getElementById("webcam-feed");
+    if (!video) {
+        video = document.createElement("video");
+        video.id = "webcam-feed";
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = true;
+        video.style.display = "none";
+        document.body.appendChild(video);
+    }
+    let canvas = document.getElementById("webcam-canvas");
+    if (!canvas) {
+        canvas = document.createElement("canvas");
+        canvas.id = "webcam-canvas";
+        canvas.style.display = "none";
+        document.body.appendChild(canvas);
+    }
+}
+
+async function startWebcam() {
+    try {
+        const video = document.getElementById("webcam-feed");
+        webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        video.srcObject = webcamStream;
+    } catch (err) {
+        console.error("Camera access denied or unavailable", err);
+        const webcamSwitch = document.getElementById("webcam-switch");
+        if (webcamSwitch) webcamSwitch.checked = false;
+        localStorage.setItem(WEBCAM_KEY, "false");
+    }
+}
+
+function stopWebcam() {
+    if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+        webcamStream = null;
+    }
+    const video = document.getElementById("webcam-feed");
+    if (video) video.srcObject = null;
+}
+
+function captureWebcamImage() {
+    if (!webcamStream) return null;
+    const video = document.getElementById("webcam-feed");
+    const canvas = document.getElementById("webcam-canvas");
+    if (!video || !canvas || video.videoWidth === 0) return null;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.8);
 }
 
 function wireUi() {
@@ -569,6 +648,7 @@ async function send() {
     if (!active) return;
 
     const language = getSelectedLanguage();
+    const imageBase64 = captureWebcamImage();
 
     setSendingState(true);
 
@@ -587,7 +667,7 @@ async function send() {
     showTypingIndicator();
 
     try {
-        // Backend call — now includes language
+        // Backend call — now includes language and image
         const base = await resolveApiBase();
         const history = active.messages.slice(-8).map((msg) => ({
             role: msg.role,
@@ -596,7 +676,7 @@ async function send() {
         const res = await fetch(`${base}/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text, history, language })
+            body: JSON.stringify({ message: text, history, language, image: imageBase64 })
         });
 
         if (!res.ok) {
