@@ -112,10 +112,3 @@ Contributions are welcome! If you'd like to improve the emotion detection accura
 
 ---
 
-## 📜 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-*Made with ❤️ by [Gobind Patel](https://github.com/GobindPatel2441)*
